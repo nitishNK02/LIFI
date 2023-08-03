@@ -1,0 +1,104 @@
+// code for determining the SNR value of the room (values known)
+
+
+% Define room dimensions
+room_length = 10; % meters
+room_width = 10; % meters
+room_height = 10; % meters
+
+% Define LED locations in the room
+led1_position = [2 2 2]; % meters
+led2_position = [8 6 2]; % meters
+
+% Define photodiode locations in the room
+photodiode1_position = [6 4 2]; % meters
+photodiode2_position = [4 6 2]; % meters
+
+% Define object position in the room
+object_position = [ ]; % meters
+
+% Define system parameters
+led_power = 5; % watts
+led_angle = 30; % degrees
+led_wavelength = 650; % nanometers
+photodiode_area = 1e-4; % square meters
+receiver_bandwidth = 10e6; % hertz
+background_noise = 1e-9; % watts
+amplifier_gain = 100; % unitless
+
+% Calculate distance from object to each LED
+distance_to_led1 = norm(object_position - led1_position);
+distance_to_led2 = norm(object_position - led2_position);
+
+% Calculate received power at each photodiode
+received_power1 = (led_power * cosd(led_angle) * photodiode_area * amplifier_gain * (led_wavelength^2)) / ...
+    (4 * pi * distance_to_led1^2);
+received_power2 = (led_power * cosd(led_angle) * photodiode_area * amplifier_gain * (led_wavelength^2)) / ...
+    (4 * pi * distance_to_led2^2);
+
+% Calculate SNR at each photodiode
+signal_power1 = received_power1;
+signal_power2 = received_power2;
+noise_power1 = background_noise * receiver_bandwidth;
+noise_power2 = background_noise * receiver_bandwidth;
+snr1 = 10 * log10(signal_power1 / noise_power1);
+snr2 = 10 * log10(signal_power2 / noise_power2);
+
+% Calculate object position using trilateration
+d1 = distance_to_led1;
+d2 = distance_to_led2;
+d3 = norm(photodiode1_position - object_position);
+d4 = norm(photodiode2_position - object_position);
+x = (d1^2 - d2^2 + room_width^2) / (2 * room_width);
+y = (d1^2 - d3^2 + d4^2 + room_length^2) / (2 * room_length);
+z = sqrt(d1^2 - x^2 - y^2);
+object_position_estimated = [x y z];
+
+% Display results
+disp(['Object actual position: (' num2str(object_position) ')']);
+disp(['Object estimated position: (' num2str(object_position_estimated) ')']);
+disp(['SNR at photodiode 1: ' num2str(snr1) ' dB']);
+disp(['SNR at photodiode 2: ' num2str(snr2) ' dB']);
+
+
+//code for determining the loction of the unknown object
+
+% Define LED and photodiode locations
+led_locations = [0,0; 0,room_height; room_width,0; room_width,room_height];
+pd_locations = [0,room_height; room_width,0; 0,0; room_width,room_height];
+
+% Define signal strength parameters
+max_intensity = 100; % maximum LED intensity
+path_loss_exponent = 2; % path loss exponent
+background_noise = 1; % background noise level
+
+% Define object location
+object_location = [5,5]; % object located at center of room
+
+% Simulate SNR values at each photodiode for the object location
+snr_values = zeros(1,length(pd_locations));
+for i=1:length(pd_locations)
+    pd_location = pd_locations(i,:);
+    dist = norm(object_location - pd_location);
+    path_loss = dist^(-path_loss_exponent);
+    signal_strength = max_intensity*path_loss;
+    snr_values(i) = signal_strength / background_noise;
+end
+
+% Determine object location based on SNR values
+[~, max_idx] = max(snr_values);
+estimated_location = pd_locations(max_idx,:);
+
+% Plot LED, photodiode, and object locations
+figure;
+hold on;
+scatter(led_locations(:,1), led_locations(:,2), 'ro');
+scatter(pd_locations(:,1), pd_locations(:,2), 'bx');
+scatter(object_location(:,1), object_location(:,2), 'g*');
+scatter(estimated_location(:,1), estimated_location(:,2), 'ks');
+legend('LED', 'Photodiode', 'Object', 'Estimated Location');
+xlim([-1, room_width+1]);
+ylim([-1, room_height+1]);
+xlabel('X (meters)');
+ylabel('Y (meters)');
+title('Indoor Positioning System Simulation');
